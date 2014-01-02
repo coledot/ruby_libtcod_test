@@ -1,6 +1,5 @@
 require 'libtcod'
 
-# TODO log on all deaths
 LIMIT_FPS = 20
 MAP_ROWS = 16
 MAP_COLS = 32
@@ -9,8 +8,6 @@ SCREEN_ROWS = 48
 SCREEN_COLS = 80
 
 # offset of map within screen
-#SCREEN_MAP_OFFSET_ROWS=1
-#SCREEN_MAP_OFFSET_COLS=1
 SCREEN_MAP_OFFSET_ROWS = (SCREEN_ROWS - MAP_ROWS) / 2
 SCREEN_MAP_OFFSET_COLS = (SCREEN_COLS - MAP_COLS) / 2
 
@@ -19,47 +16,42 @@ ACTORS_MAX = 20
 DEFAULT_SCREEN_FORE_COLOR = TCOD::Color::LIGHTEST_GREY
 DEFAULT_SCREEN_BACK_COLOR = TCOD::Color::BLACK
 
-def handle_keys
-  player_moved = false
+def get_input
   key = TCOD.console_wait_for_keypress(true)
 
   if key.vk == TCOD::KEY_ESCAPE
-    # FIXME lol
-    return true, player_moved #exit game
+    return TCOD::KEY_ESCAPE
   end
 
-  player = $actors[:player]
-  #movement keys
   if key.pressed
-    if key.c == 'k'
-      player_moved = move(player, :up)
-    elsif key.c == 'j'
-      player_moved = move(player, :down)
-    elsif key.c == 'h'
-      player_moved = move(player, :left)
-    elsif key.c == 'l'
-      player_moved = move(player, :right)
-    elsif key.c == '.'
-      #puts "DEBUG: player is resting"
-      player_moved = move(player, :rest)
-      # FIXME lol
-      return false, true
-    else
-      #puts "DEBUG: unknown command: #{key.c}"
-      # FIXME lol
-      return false, false
-    end
-    #puts "DEBUG: after move; player pos is (#{player[:x]}, #{player[:y]})"
-
-    unless player_moved
-      #puts "DEBUG: player did not make a valid move this turn"
-    end
+    return key.c
   end
-  # FIXME lol
-  return false, player_moved
+
+  return nil
 end
 
-$prng = Random.new
+def process_player_input input_key
+  player = $actors[:player]
+
+  # movement keys
+  player_moved = if input_key == 'k'
+    move(player, :up)
+  elsif input_key == 'j'
+    move(player, :down)
+  elsif input_key == 'h'
+    move(player, :left)
+  elsif input_key == 'l'
+    move(player, :right)
+  elsif input_key == '.'
+    #puts "DEBUG: player is resting"
+    move(player, :rest)
+  else
+    #puts "DEBUG: unknown command: #{key.c}"
+    false
+  end
+
+  return player_moved
+end
 
 def init_map
   mapp = []
@@ -252,6 +244,7 @@ def move(actor, dir)
   elsif dir == :down
     new_pos = { x: actor[:x], y: actor[:y] + 1 }
   elsif dir == :rest
+    # resting always succeeds
     return true
   end
 
@@ -278,7 +271,7 @@ def initialize_game
                                TCOD::FONT_TYPE_GREYSCALE | TCOD::FONT_LAYOUT_TCOD, 0, 0)
   TCOD.console_init_root(SCREEN_COLS, SCREEN_ROWS, 'tcod test', false, TCOD::RENDERER_SDL)
   TCOD.sys_set_fps(LIMIT_FPS)
-  
+
   $dungeon_level = init_map
   $actors = init_actors
 end
@@ -303,12 +296,10 @@ def draw_shit
 
   # draw actors
   $actors.values.each do |actor|
-    # FIXME is the fore/background swap really necessary? (probably, yes)
     TCOD.console_set_default_foreground(nil, actor[:fore_color])
     TCOD.console_set_default_background(nil, actor[:back_color])
     TCOD.console_put_char(nil, actor[:x]+SCREEN_MAP_OFFSET_COLS, actor[:y]+SCREEN_MAP_OFFSET_ROWS,
                           actor[:sigil].ord, TCOD::BKGND_SET)
-    # FIXME is the fore/background swap really necessary?
     TCOD.console_set_default_foreground(nil, DEFAULT_SCREEN_FORE_COLOR)
     TCOD.console_set_default_background(nil, DEFAULT_SCREEN_BACK_COLOR)
   end
@@ -319,26 +310,29 @@ def player_is_alone?
   $actors.values.count == 1 && (not $actors[:player].nil?)
 end
 
+def process_actors
+  $actors.values.select{ |a| not a[:player] }.each do |actor|
+    move_dir = decide_move(actor)
+    #puts "DEBUG: #{actor[:name]} decides to move #{move_dir}"
+    move(actor, move_dir)
+  end
+end
+
 ###
+
+$prng = Random.new
 
 initialize_game
 
 until TCOD.console_is_window_closed
   draw_shit
 
-  # handle keys and exit game if needed
-  # process player input (done in handle_keys)
-  # FIXME clumsily handled return values
-  will_exit, player_acted = handle_keys
-  break if will_exit
-  
+  entered_key = get_input
+  break if entered_key == TCOD::KEY_ESCAPE
+  player_acted = process_player_input entered_key
+
   if player_acted
-    # allow other actors to, well, act
-    $actors.values.select{ |a| not a[:player] }.each do |actor|
-      move_dir = decide_move(actor)
-      #puts "DEBUG: #{actor[:name]} decides to move #{move_dir}"
-      move(actor, move_dir)
-    end
+    process_actors
   end
 
   if player_is_alone?
