@@ -1,17 +1,23 @@
 require 'libtcod'
 
+# TODO log on all deaths
 LIMIT_FPS = 20
-MAP_ROWS = 22
-MAP_COLS = 44
+MAP_ROWS = 16
+MAP_COLS = 32
 
-SCREEN_ROWS = 24 #MAP_ROWS+2
-SCREEN_COLS = 80 #MAP_COLS+2
+SCREEN_ROWS = 48
+SCREEN_COLS = 80
 
 # offset of map within screen
-SCREEN_MAP_OFFSET_ROWS=1
-SCREEN_MAP_OFFSET_COLS=1
+#SCREEN_MAP_OFFSET_ROWS=1
+#SCREEN_MAP_OFFSET_COLS=1
+SCREEN_MAP_OFFSET_ROWS = (SCREEN_ROWS - MAP_ROWS) / 2
+SCREEN_MAP_OFFSET_COLS = (SCREEN_COLS - MAP_COLS) / 2
 
 ACTORS_MAX = 20
+
+DEFAULT_SCREEN_FORE_COLOR = TCOD::Color::LIGHTEST_GREY
+DEFAULT_SCREEN_BACK_COLOR = TCOD::Color::BLACK
 
 def handle_keys
   player_moved = false
@@ -76,6 +82,8 @@ def init_actors
   $actors = {
     player: {
       sigil: '@',
+      fore_color: TCOD::Color::WHITE,
+      back_color: TCOD::Color::DARKER_GREY,
       x: $prng.rand(MAP_COLS),
       y: $prng.rand(MAP_ROWS),
       hp: 3,
@@ -89,6 +97,8 @@ def init_actors
     bsym = :"baddie_#{n}"
     $actors[bsym] = {
       sigil: 'e',
+      fore_color: TCOD::Color::LIGHT_SEPIA,
+      back_color: TCOD::Color::BLACK,
       x: $prng.rand(MAP_COLS),
       y: $prng.rand(MAP_ROWS),
       hp: 1,
@@ -100,6 +110,7 @@ def init_actors
 end
 
 def can_move?(actor, dir)
+  #puts "DEBUG: actor #{actor[:name]} dir #{dir}"
   if dir == :left
     actor[:x] > 0 && $dungeon_level[actor[:y]][actor[:x]-1] == '.'
   elsif dir == :right
@@ -121,7 +132,7 @@ def actor_at_location(location)
   return nil
 end
 
-def near(actor, other_actor, distance=6)
+def near(actor, other_actor, distance=8)
   dx = actor[:x] - other_actor[:x]
   dy = actor[:y] - other_actor[:y]
   #puts "DEBUG: distance from #{actor[:name]} to #{other_actor[:name]}: #{(dx + dy).abs}"
@@ -146,16 +157,58 @@ def dir_to(actor, other_actor)
   end
 end
 
+def transparent?(cell)
+  cell != '#'
+end
+
+def walkable?(cell)
+  cell == '.'
+end
+
+def make_tcod_map_from_dungeon_level(dungeon_level)
+  #tcod_map = TCOD.map_new(dungeon_level.first.count, dungeon_level.count)
+  tcod_map = TCOD::Map.new(dungeon_level.first.count, dungeon_level.count)
+  dungeon_level.each_with_index do |level_row, row_ind|
+    level_row.each_with_index do |cell, col_ind|
+      tcod_map.set_properties(col_ind, row_ind, transparent?(cell), walkable?(cell))
+    end
+  end
+  tcod_map
+end
+
+def coords_to_dir(dx, dy)
+  if dx < 0 && dy == 0
+    :left
+  elsif dx > 0 && dy == 0
+    :right
+  elsif dx == 0 && dy < 0
+    :up
+  elsif dx == 0 && dy > 0
+    :down
+  end
+end
+
 def decide_move(actor)
   player = $actors[:player]
-  # FIXME replace with some proper pathfinding
-  if near(actor, player)
-    #puts "DEBUG: #{actor[:name]} wants to pursue the player"
-    dir = dir_to(actor, player)
+  if near(actor,player)
+    actor_map = make_tcod_map_from_dungeon_level $dungeon_level
+    actor_path = TCOD::Path.by_map(actor_map, diagonalCost=0.0)
+    actor_path.compute(actor[:x], actor[:y], player[:x], player[:y])
+    px, py = actor_path.walk
+    #puts "DEBUG: walk returned px: #{px} py: #{py}"
+    if px == false
+      #puts "DEBUG: #{actor[:name]} nowhere to move; resting"
+      return :rest
+    end
+
+    dx, dy = px - actor[:x], py - actor[:y]
+    #puts "DEBUG: dx: #{dx} dy: #{dy}"
+    dir = coords_to_dir(dx, dy)
   else
     #puts "DEBUG: #{actor[:name]} is wandering"
     dir = [:up, :down, :left, :right].sample
   end
+  dir
 end
 
 def player?(actor)
@@ -164,6 +217,27 @@ end
 
 def alive?(actor)
   actor[:hp] > 0
+end
+
+def proc_attack(assailant, victim)
+  victim[:hp] -= 1
+  #puts "DEBUG: #{other_actor[:name]}: ouch! #{other_actor[:hp]} hp remain"
+  if player?(victim) && alive?(victim)
+    puts "Ouch! HP remaining: #{victim[:hp]}"
+  end
+  if not alive?(victim)
+    #puts "DEBUG: deleting victim #{victim} cause it's dead"
+    puts "#{assailant[:name]} killed #{victim[:name]}"
+    $actors.delete($actors.key(victim))
+    if player?(victim)
+      puts "The Dashing Hero has died. Score: 0"
+      exit 0
+    end
+  end
+end
+
+def hostile_towards?(actor, other_actor)
+  actor[:allegiance] != other_actor[:allegiance]
 end
 
 def move(actor, dir)
@@ -183,23 +257,13 @@ def move(actor, dir)
 
   other_actor = actor_at_location(new_pos)
   if other_actor
-    #puts "DEBUG: actor #{actor} is moving into/attacking #{other_actor}"
-    # hurt other_actor
-    other_actor[:hp] -= 1
-    #puts "DEBUG: #{other_actor[:name]}: ouch! #{other_actor[:hp]} hp remain"
-    if player?(other_actor) && alive?(other_actor)
-      puts "Ouch! HP remaining: #{other_actor[:hp]}"
-    end
-    if not alive?(other_actor)
-      #puts "DEBUG: deleting other_actor #{other_actor} cause it's dead"
-      $actors.delete($actors.key(other_actor))
-      if player?(other_actor)
-        puts "The Dashing Hero has died. Score: 0"
-        exit 0
-      end
-      actor[:x], actor[:y] = new_pos[:x], new_pos[:y]
+    if hostile_towards?(actor, other_actor)
+      proc_attack(actor, other_actor)
+      # attack takes place, but position doesn't change
+      return true
     else
-      # actor does not move; other_actor is still alive
+      # FIXME make actors more intelligent
+      puts "DEBUG: #{actor[:name]} can't move w/o killing a friendly; forcing rest"
       return false
     end
   else
@@ -221,11 +285,11 @@ end
 
 def draw_shit
   # draw background
-  #TCOD.console_set_default_foreground(nil, TCOD::Color::WHITE)
-  TCOD.console_set_default_foreground(nil, TCOD::Color::LIGHTEST_GREY)
+  TCOD.console_set_default_foreground(nil, DEFAULT_SCREEN_FORE_COLOR)
+  TCOD.console_set_default_background(nil, DEFAULT_SCREEN_BACK_COLOR)
   (0...SCREEN_ROWS).each do |screen_row|
     (0...SCREEN_COLS).each do |screen_col|
-      TCOD.console_put_char(nil, screen_col, screen_row, ' '.ord, TCOD::BKGND_NONE)
+      TCOD.console_put_char(nil, screen_col, screen_row, ' '.ord, TCOD::BKGND_SET)
     end
   end
 
@@ -233,14 +297,20 @@ def draw_shit
   $dungeon_level.each_with_index do |level_row, row_ind|
     level_row.each_with_index do |cell, col_ind|
       TCOD.console_put_char(nil, col_ind+SCREEN_MAP_OFFSET_COLS, row_ind+SCREEN_MAP_OFFSET_ROWS,
-                            cell.ord, TCOD::BKGND_NONE)
+                            cell.ord, TCOD::BKGND_SET)
     end
   end
 
   # draw actors
   $actors.values.each do |actor|
+    # FIXME is the fore/background swap really necessary? (probably, yes)
+    TCOD.console_set_default_foreground(nil, actor[:fore_color])
+    TCOD.console_set_default_background(nil, actor[:back_color])
     TCOD.console_put_char(nil, actor[:x]+SCREEN_MAP_OFFSET_COLS, actor[:y]+SCREEN_MAP_OFFSET_ROWS,
-                          actor[:sigil].ord, TCOD::BKGND_NONE)
+                          actor[:sigil].ord, TCOD::BKGND_SET)
+    # FIXME is the fore/background swap really necessary?
+    TCOD.console_set_default_foreground(nil, DEFAULT_SCREEN_FORE_COLOR)
+    TCOD.console_set_default_background(nil, DEFAULT_SCREEN_BACK_COLOR)
   end
   TCOD.console_flush()
 end
