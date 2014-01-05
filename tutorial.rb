@@ -11,6 +11,12 @@ SCREEN_COLS = 80
 SCREEN_MAP_OFFSET_ROWS = (SCREEN_ROWS - MAP_ROWS) / 2
 SCREEN_MAP_OFFSET_COLS = (SCREEN_COLS - MAP_COLS) / 2
 
+MSG_LOG_ROWS = 4
+MSG_LOG_COLS = 40
+MAX_MSG_LEN = MSG_LOG_COLS - 2
+SCREEN_MSG_LOG_OFFSET_ROWS = 44
+SCREEN_MSG_LOG_OFFSET_COLS = 0
+
 ACTORS_MAX = 20
 
 DEFAULT_SCREEN_FORE_COLOR = TCOD::Color::LIGHTEST_GREY
@@ -69,6 +75,12 @@ def init_map
   mapp
 end
 
+#class Actor
+#  def initialize
+#
+#  end
+#end
+
 def init_actors
   # start w/ just the player
   $actors = {
@@ -124,7 +136,7 @@ def actor_at_location(location)
   return nil
 end
 
-def near(actor, other_actor, distance=8)
+def is_near?(actor, other_actor, distance=8)
   dx = actor[:x] - other_actor[:x]
   dy = actor[:y] - other_actor[:y]
   #puts "DEBUG: distance from #{actor[:name]} to #{other_actor[:name]}: #{(dx + dy).abs}"
@@ -153,16 +165,32 @@ def transparent?(cell)
   cell != '#'
 end
 
-def walkable?(cell)
-  cell == '.'
+def allies_of(actor)
+  $actors.values.select{|a| a[:allegiance] == actor[:allegiance]}
 end
 
-def make_tcod_map_from_dungeon_level(dungeon_level)
-  #tcod_map = TCOD.map_new(dungeon_level.first.count, dungeon_level.count)
+def hostile_towards?(actor, other_actor)
+  actor[:allegiance] != other_actor[:allegiance]
+end
+
+def ally_at?(actor, col, row)
+  other_actor = actor_at_location({x: col, y: row})
+  return false unless other_actor
+
+  allies = allies_of actor
+  allies.include? other_actor
+end
+
+def walkable?(actor, col, row, cell)
+  cell == '.' && (not ally_at?(actor, col, row))
+end
+
+def make_tcod_map_from_dungeon_level(actor, dungeon_level)
   tcod_map = TCOD::Map.new(dungeon_level.first.count, dungeon_level.count)
   dungeon_level.each_with_index do |level_row, row_ind|
     level_row.each_with_index do |cell, col_ind|
-      tcod_map.set_properties(col_ind, row_ind, transparent?(cell), walkable?(cell))
+      tcod_map.set_properties(col_ind, row_ind, transparent?(cell),
+                              walkable?(actor, col_ind, row_ind, cell))
     end
   end
   tcod_map
@@ -180,10 +208,14 @@ def coords_to_dir(dx, dy)
   end
 end
 
+def free_moves(actor)
+  [:up, :down, :left, :right].select { |dir| can_move? actor, dir }
+end
+
 def decide_move(actor)
   player = $actors[:player]
-  if near(actor,player)
-    actor_map = make_tcod_map_from_dungeon_level $dungeon_level
+  if is_near?(actor,player)
+    actor_map = make_tcod_map_from_dungeon_level(actor, $dungeon_level)
     actor_path = TCOD::Path.by_map(actor_map, diagonalCost=0.0)
     actor_path.compute(actor[:x], actor[:y], player[:x], player[:y])
     px, py = actor_path.walk
@@ -198,7 +230,9 @@ def decide_move(actor)
     dir = coords_to_dir(dx, dy)
   else
     #puts "DEBUG: #{actor[:name]} is wandering"
-    dir = [:up, :down, :left, :right].sample
+    #dir = [:up, :down, :left, :right].sample
+    #puts "DEBUG: free_moves(#{actor[:name]}) is #{free_moves(actor)}"
+    dir = free_moves(actor).sample
   end
   dir
 end
@@ -215,21 +249,17 @@ def proc_attack(assailant, victim)
   victim[:hp] -= 1
   #puts "DEBUG: #{other_actor[:name]}: ouch! #{other_actor[:hp]} hp remain"
   if player?(victim) && alive?(victim)
-    puts "Ouch! HP remaining: #{victim[:hp]}"
+    msg_log "Ouch! HP remaining: #{victim[:hp]}"
   end
   if not alive?(victim)
     #puts "DEBUG: deleting victim #{victim} cause it's dead"
-    puts "#{assailant[:name]} killed #{victim[:name]}"
+    msg_log"#{assailant[:name]} killed #{victim[:name]}"
     $actors.delete($actors.key(victim))
     if player?(victim)
-      puts "The Dashing Hero has died. Score: 0"
+      msg_log "The Dashing Hero has died. Score: 0"
       exit 0
     end
   end
-end
-
-def hostile_towards?(actor, other_actor)
-  actor[:allegiance] != other_actor[:allegiance]
 end
 
 def move(actor, dir)
@@ -256,7 +286,7 @@ def move(actor, dir)
       return true
     else
       # FIXME make actors more intelligent
-      puts "DEBUG: #{actor[:name]} can't move w/o killing a friendly; forcing rest"
+      msg_log "DEBUG: #{actor[:name]} can't move w/o killing a friendly; forcing rest"
       return false
     end
   else
@@ -274,6 +304,8 @@ def initialize_game
 
   $dungeon_level = init_map
   $actors = init_actors
+
+  msg_log "The Dashing Hero finds him/herself in a sticky situation."
 end
 
 def draw_shit
@@ -303,6 +335,14 @@ def draw_shit
     TCOD.console_set_default_foreground(nil, DEFAULT_SCREEN_FORE_COLOR)
     TCOD.console_set_default_background(nil, DEFAULT_SCREEN_BACK_COLOR)
   end
+
+  # draw log
+  $msg_log.last(4).each_with_index do |msg, i|
+    msg.chars.each_with_index do |c, j|
+      TCOD.console_put_char(nil, j, SCREEN_MSG_LOG_OFFSET_ROWS+i, c.ord, TCOD::BKGND_SET)
+    end
+  end
+
   TCOD.console_flush()
 end
 
@@ -318,8 +358,18 @@ def process_actors
   end
 end
 
+def msg_log(msg)
+  while msg.length > MAX_MSG_LEN
+    shorter_msg = msg[0...MAX_MSG_LEN]
+    $msg_log.push shorter_msg + " _"
+    msg = msg[MAX_MSG_LEN..-1]
+  end
+  $msg_log.push msg if msg.length > 0
+end
+
 ###
 
+$msg_log = []
 $prng = Random.new
 
 initialize_game
@@ -333,11 +383,10 @@ until TCOD.console_is_window_closed
 
   if player_acted
     process_actors
-  end
 
-  if player_is_alone?
-    puts "You win!!! Score is 100."
-    exit 0
+    if player_is_alone?
+      msg_log "You win!!! Score is 100. Press [ESC] to exit."
+    end
   end
 end
 
