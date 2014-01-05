@@ -43,45 +43,11 @@ class Actor
     @hp > 0
   end
 
-  def free_moves
-    [:up, :down, :left, :right].select { |dir| can_move? dir }
-  end
-
-  def can_move?(dir)
-    level = where_am_i
-
-    if dir == :left
-      @pos_x > 0 && level[@pos_y][@pos_x-1] == '.'
-    elsif dir == :right
-      @pos_x < MAP_COLS - 1 && level[@pos_y][@pos_x+1] == '.'
-    elsif dir == :up
-      @pos_y > 0 && level[@pos_y-1][@pos_x] == '.'
-    elsif dir == :down
-      @pos_y < MAP_ROWS - 1 && level[@pos_y+1][@pos_x] == '.'
-    elsif dir == :rest
-      true
-    end
-  end
-
-  def where_am_i
-    @current_dlevel
-  end
-
-  def is_near?(other_actor, distance=8)
-    dx = @pos_x - other_actor.pos_x
-    dy = @pos_y - other_actor.pos_y
-    (dx + dy).abs < distance
-  end
-
-  def hostile_towards?(other_actor)
-    @allegiance != other_actor.allegiance
-  end
-
   def decide_move
     # FIXME remove dependence on globals
     player = $actors[:player]
     if is_near? player
-      actor_map = make_tcod_map_from_dungeon_level(self, where_am_i)
+      actor_map = make_tcod_map_from_dungeon_level(where_am_i)
       actor_path = TCOD::Path.by_map(actor_map, diagonalCost=0.0)
       actor_path.compute(@pos_x, @pos_y, player.pos_x, player.pos_y)
       px, py = actor_path.walk
@@ -131,24 +97,6 @@ class Actor
     true
   end
 
-  def proc_attack(victim)
-    # TODO expand to victims, plural
-    # `self` is the assailant
-    victim.hurt! 1
-    if victim.player? && victim.alive?
-      msg_log "Ouch! HP remaining: #{victim.hp}"
-    end
-    if not victim.alive?
-      msg_log"#{@name} killed #{victim.name}"
-      # FIXME remove dependence on globals
-      $actors.delete($actors.key(victim))
-      if victim.player?
-        msg_log "The Dashing Hero has died. Score: 0"
-        exit 0
-      end
-    end
-  end
-
   def dir_to(other_actor)
     dx = @pos_x - other_actor.pos_x
     dy = @pos_y - other_actor.pos_y
@@ -165,6 +113,73 @@ class Actor
         :down
       end
     end
+  end
+  
+  private
+
+  def free_moves
+    [:up, :down, :left, :right].select { |dir| can_move? dir }
+  end
+
+  def where_am_i
+    @current_dlevel
+  end
+
+  def is_near?(other_actor, distance=8)
+    dx = @pos_x - other_actor.pos_x
+    dy = @pos_y - other_actor.pos_y
+    (dx + dy).abs < distance
+  end
+
+  def hostile_towards?(other_actor)
+    @allegiance != other_actor.allegiance
+  end
+
+  def can_move?(dir)
+    level = where_am_i
+
+    if dir == :left
+      @pos_x > 0 && level[@pos_y][@pos_x-1] == '.'
+    elsif dir == :right
+      @pos_x < MAP_COLS - 1 && level[@pos_y][@pos_x+1] == '.'
+    elsif dir == :up
+      @pos_y > 0 && level[@pos_y-1][@pos_x] == '.'
+    elsif dir == :down
+      @pos_y < MAP_ROWS - 1 && level[@pos_y+1][@pos_x] == '.'
+    elsif dir == :rest
+      true
+    end
+  end
+
+  def proc_attack(victim)
+    # TODO expand to victims, plural
+    # `self` is the assailant
+    victim.hurt! 1
+    if victim.player? && victim.alive?
+      msg_log "Ouch! HP remaining: #{victim.hp}"
+    end
+    if not victim.alive?
+      msg_log"#{@name} killed #{victim.name}"
+      # FIXME remove dependence on globals
+      $actors.delete($actors.key(victim))
+      if victim.player?
+        # FIXME msg isn't seen before exit
+        msg_log "The Dashing Hero has died. Score: 0"
+        exit 0
+      end
+    end
+  end
+
+  def make_tcod_map_from_dungeon_level(dungeon_level)
+    tcod_map = TCOD::Map.new(dungeon_level.first.count, dungeon_level.count)
+    dungeon_level.each_with_index do |level_row, row_ind|
+      level_row.each_with_index do |cell, col_ind|
+        # FIXME walkable?/transparent? should be member methods on dungeon_level
+        tcod_map.set_properties(col_ind, row_ind, transparent?(cell),
+                                walkable?(self, col_ind, row_ind, cell))
+      end
+    end
+    tcod_map
   end
 end
 

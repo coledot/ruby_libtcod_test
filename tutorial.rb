@@ -1,6 +1,7 @@
 require 'libtcod'
 
 require './actor'
+require './drawing'
 
 LIMIT_FPS = 20
 MAP_ROWS = 16
@@ -39,6 +40,8 @@ def get_input
 end
 
 def process_player_input input_key
+  return false unless input_key
+
   player = $actors[:player]
 
   # movement keys
@@ -137,17 +140,6 @@ def walkable?(actor, col, row, cell)
   cell == '.' && (not ally_at?(actor, col, row))
 end
 
-def make_tcod_map_from_dungeon_level(actor, dungeon_level)
-  tcod_map = TCOD::Map.new(dungeon_level.first.count, dungeon_level.count)
-  dungeon_level.each_with_index do |level_row, row_ind|
-    level_row.each_with_index do |cell, col_ind|
-      tcod_map.set_properties(col_ind, row_ind, transparent?(cell),
-                              walkable?(actor, col_ind, row_ind, cell))
-    end
-  end
-  tcod_map
-end
-
 def coords_to_dir(dx, dy)
   if dx < 0 && dy == 0
     :left
@@ -170,45 +162,6 @@ def initialize_game
   $actors = init_actors
 
   msg_log "The Dashing Hero finds him/herself in a sticky situation."
-end
-
-def draw_shit
-  # draw background
-  TCOD.console_set_default_foreground(nil, DEFAULT_SCREEN_FORE_COLOR)
-  TCOD.console_set_default_background(nil, DEFAULT_SCREEN_BACK_COLOR)
-  (0...SCREEN_ROWS).each do |screen_row|
-    (0...SCREEN_COLS).each do |screen_col|
-      TCOD.console_put_char(nil, screen_col, screen_row, ' '.ord, TCOD::BKGND_SET)
-    end
-  end
-
-  # draw map
-  $dungeon_level.each_with_index do |level_row, row_ind|
-    level_row.each_with_index do |cell, col_ind|
-      TCOD.console_put_char(nil, col_ind+SCREEN_MAP_OFFSET_COLS, row_ind+SCREEN_MAP_OFFSET_ROWS,
-                            cell.ord, TCOD::BKGND_SET)
-    end
-  end
-
-  # draw actors
-  $actors.values.each do |actor|
-    TCOD.console_set_default_foreground(nil, actor.fore_color)
-    TCOD.console_set_default_background(nil, actor.back_color)
-    TCOD.console_put_char(nil, actor.pos_x+SCREEN_MAP_OFFSET_COLS, actor.pos_y+SCREEN_MAP_OFFSET_ROWS,
-                          actor.sigil.ord, TCOD::BKGND_SET)
-    TCOD.console_set_default_foreground(nil, DEFAULT_SCREEN_FORE_COLOR)
-    TCOD.console_set_default_background(nil, DEFAULT_SCREEN_BACK_COLOR)
-  end
-
-  # draw log
-  # FIXME derp, libtcod has better primitives for writing strings to the screen
-  $msg_log.last(4).each_with_index do |msg, i|
-    msg.chars.each_with_index do |c, j|
-      TCOD.console_put_char(nil, j, SCREEN_MSG_LOG_OFFSET_ROWS+i, c.ord, TCOD::BKGND_SET)
-    end
-  end
-
-  TCOD.console_flush()
 end
 
 def player_is_alone?
@@ -239,7 +192,7 @@ $prng = Random.new
 initialize_game
 
 until TCOD.console_is_window_closed
-  draw_shit
+  Drawing.draw_shit
 
   entered_key = get_input
   break if entered_key == TCOD::KEY_ESCAPE
