@@ -26,7 +26,7 @@ class Actor
     @name           = options[:name]
     @allegiance     = options[:allegiance]
     @player         = options[:player]
-    @current_dlevel = current_dlevel
+    @dungeon_level = current_dlevel
   end
   attr_accessor :sigil, :fore_color, :back_color, :pos_x, :pos_y, :hp, :name, :allegiance
 
@@ -34,20 +34,23 @@ class Actor
     @player
   end
 
-  def hurt!(damage)
-    @hp -= damage
-  end
-
   # XXX nevermind the philosophical dillemmas, "should a zombie ever return true for .alive()?" etc.
   def alive?
     @hp > 0
   end
 
+  def hurt(damage)
+    @hp -= damage
+  end
+
+  def kill!
+    GlobalGameState::ACTORS.delete(GlobalGameState::ACTORS.key(self))
+  end
+
   def decide_move
-    # FIXME remove dependence on globals
-    player = $actors[:player]
+    player = GlobalGameState::PLAYER
     if is_near? player
-      actor_map = make_tcod_map_from_dungeon_level(where_am_i)
+      actor_map = make_tcod_map_from_dungeon_level
       actor_path = TCOD::Path.by_map(actor_map, diagonalCost=0.0)
       actor_path.compute(@pos_x, @pos_y, player.pos_x, player.pos_y)
       px, py = actor_path.walk
@@ -79,7 +82,7 @@ class Actor
       return true
     end
   
-    other_actor = actor_at_location(new_pos)
+    other_actor = @dungeon_level.actor_at_location(new_pos)
     if other_actor
       if hostile_towards? other_actor
         proc_attack other_actor
@@ -122,7 +125,7 @@ class Actor
   end
 
   def where_am_i
-    @current_dlevel
+    @dungeon_level.cells
   end
 
   def is_near?(other_actor, distance=8)
@@ -154,32 +157,42 @@ class Actor
   def proc_attack(victim)
     # TODO expand to victims, plural
     # `self` is the assailant
-    victim.hurt! 1
+    victim.hurt 1
     if victim.player? && victim.alive?
       msg_log "Ouch! HP remaining: #{victim.hp}"
     end
     if not victim.alive?
-      msg_log"#{@name} killed #{victim.name}"
-      # FIXME remove dependence on globals
-      $actors.delete($actors.key(victim))
+      msg_log "#{@name} killed #{victim.name}"
+      victim.kill!
       if victim.player?
-        # FIXME msg isn't seen before exit
         msg_log "The Dashing Hero has died. Score: 0"
-        exit 0
+        exit_game
       end
     end
   end
 
-  def make_tcod_map_from_dungeon_level(dungeon_level)
-    tcod_map = TCOD::Map.new(dungeon_level.first.count, dungeon_level.count)
-    dungeon_level.each_with_index do |level_row, row_ind|
+  def make_tcod_map_from_dungeon_level
+    dlevel = where_am_i
+    tcod_map = TCOD::Map.new(dlevel.first.count, dlevel.count)
+    dlevel.each_with_index do |level_row, row_ind|
       level_row.each_with_index do |cell, col_ind|
-        # FIXME walkable?/transparent? should be member methods on dungeon_level
-        tcod_map.set_properties(col_ind, row_ind, transparent?(cell),
-                                walkable?(self, col_ind, row_ind, cell))
+        tcod_map.set_properties(col_ind, row_ind, @dungeon_level.transparent?(col_ind, row_ind),
+                                @dungeon_level.walkable?(self, col_ind, row_ind))
       end
     end
     tcod_map
+  end
+
+  def coords_to_dir(dx, dy)
+    if dx < 0 && dy == 0
+      :left
+    elsif dx > 0 && dy == 0
+      :right
+    elsif dx == 0 && dy < 0
+      :up
+    elsif dx == 0 && dy > 0
+      :down
+    end
   end
 end
 

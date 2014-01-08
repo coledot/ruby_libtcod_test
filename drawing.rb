@@ -1,7 +1,28 @@
 require 'libtcod'
 
-module Drawing
-  def self.draw_shit
+class Drawing
+  LIMIT_FPS = 20
+  SCREEN_ROWS = 24
+  SCREEN_COLS = 60
+
+  SCREEN_MSG_LOG_OFFSET_ROWS = 18 # FIXME dependent on MSG_LOG_ROWS
+
+  DEFAULT_SCREEN_FORE_COLOR = TCOD::Color::LIGHTEST_GREY
+  DEFAULT_SCREEN_BACK_COLOR = TCOD::Color::BLACK
+
+  def initialize(map_rows, map_cols)
+    @map_rows, @map_cols = map_rows, map_cols
+    TCOD.console_set_custom_font('dejavu16x16_gs_tc.png',
+                                 TCOD::FONT_TYPE_GREYSCALE | TCOD::FONT_LAYOUT_TCOD, 0, 0)
+    TCOD.console_init_root(SCREEN_COLS, SCREEN_ROWS, 'tcod test', false, TCOD::RENDERER_SDL)
+    TCOD.sys_set_fps(LIMIT_FPS)
+
+    # offset of map within screen
+    @screen_map_offset_rows = 1 #(SCREEN_ROWS - @map_rows) / 2
+    @screen_map_offset_cols = 1 #(SCREEN_COLS - @map_cols) / 2
+  end
+
+  def draw_shit
     draw_background
     draw_map
     draw_actors
@@ -10,7 +31,9 @@ module Drawing
     TCOD.console_flush()
   end
 
-  def self.draw_background
+  private
+
+  def draw_background
     TCOD.console_set_default_foreground(nil, DEFAULT_SCREEN_FORE_COLOR)
     TCOD.console_set_default_background(nil, DEFAULT_SCREEN_BACK_COLOR)
     (0...SCREEN_ROWS).each do |screen_row|
@@ -20,30 +43,37 @@ module Drawing
     end
   end
 
-  def self.draw_map
-    $dungeon_level.each_with_index do |level_row, row_ind|
+  def draw_map
+    GlobalGameState::DUNGEON_LEVEL.cells.each_with_index do |level_row, row_ind|
       level_row.each_with_index do |cell, col_ind|
-        TCOD.console_put_char(nil, col_ind+SCREEN_MAP_OFFSET_COLS, row_ind+SCREEN_MAP_OFFSET_ROWS,
-                              cell.ord, TCOD::BKGND_SET)
+        # TODO map_location_to_screen_location(...)
+        draw_char_to_location(cell, {x: col_ind+@screen_map_offset_cols,
+                                     y: row_ind+@screen_map_offset_rows})
       end
     end
   end
 
-  def self.draw_actors
-    $actors.values.each do |actor|
+  def draw_actors
+    GlobalGameState::ACTORS.values.each do |actor|
       TCOD.console_set_default_foreground(nil, actor.fore_color)
       TCOD.console_set_default_background(nil, actor.back_color)
-      TCOD.console_put_char(nil, actor.pos_x+SCREEN_MAP_OFFSET_COLS, actor.pos_y+SCREEN_MAP_OFFSET_ROWS,
-                            actor.sigil.ord, TCOD::BKGND_SET)
+      # TODO map_location_to_screen_location(...)
+      draw_char_to_location(actor.sigil, {x: actor.pos_x+@screen_map_offset_cols,
+                                          y: actor.pos_y+@screen_map_offset_rows})
       TCOD.console_set_default_foreground(nil, DEFAULT_SCREEN_FORE_COLOR)
+
       TCOD.console_set_default_background(nil, DEFAULT_SCREEN_BACK_COLOR)
     end
   end
 
-  def self.draw_log
-    $msg_log.last(MSG_LOG_ROWS).each_with_index do |msg, i|
+  def draw_log
+    GlobalGameState::MSG_LOG.last(MSG_LOG_ROWS).each_with_index do |msg, i|
       TCOD.console_print(nil, TCOD::LEFT, SCREEN_MSG_LOG_OFFSET_ROWS+i, msg)
     end
+  end
+
+  def draw_char_to_location(char, location)
+    TCOD.console_put_char(nil, location[:x], location[:y], char.ord, TCOD::BKGND_SET)
   end
 end
 

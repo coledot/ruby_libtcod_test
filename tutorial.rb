@@ -2,28 +2,22 @@ require 'libtcod'
 
 require './actor'
 require './drawing'
+require './dungeon_level'
 
-LIMIT_FPS = 20
 MAP_ROWS = 16
 MAP_COLS = 32
 
-SCREEN_ROWS = 48
-SCREEN_COLS = 80
-
-# offset of map within screen
-SCREEN_MAP_OFFSET_ROWS = (SCREEN_ROWS - MAP_ROWS) / 2
-SCREEN_MAP_OFFSET_COLS = (SCREEN_COLS - MAP_COLS) / 2
-
-MSG_LOG_ROWS = 4
+MSG_LOG_ROWS = 6
 MSG_LOG_COLS = 60
 MAX_MSG_LEN = MSG_LOG_COLS - 2
-SCREEN_MSG_LOG_OFFSET_ROWS = 44
-SCREEN_MSG_LOG_OFFSET_COLS = 0
 
 ACTORS_MAX = 20
 
-DEFAULT_SCREEN_FORE_COLOR = TCOD::Color::LIGHTEST_GREY
-DEFAULT_SCREEN_BACK_COLOR = TCOD::Color::BLACK
+def process_input
+  entered_key = get_input
+  exit_game if entered_key == TCOD::KEY_ESCAPE
+  process_player_input entered_key
+end
 
 def get_input
   key = TCOD.console_wait_for_keypress(true)
@@ -42,7 +36,7 @@ end
 def process_player_input input_key
   return false unless input_key
 
-  player = $actors[:player]
+  player = GlobalGameState::PLAYER
 
   # movement keys
   player_moved = if input_key == 'k'
@@ -63,32 +57,16 @@ def process_player_input input_key
   return player_moved
 end
 
-def init_map
-  mapp = []
-  MAP_ROWS.times do |row|
-    new_row = []
-    MAP_COLS.times do |col|
-      if $prng.rand > 0.8
-        new_row.push "#"
-      else
-        new_row.push "."
-      end
-    end
-    mapp.push new_row
-  end
-  mapp
-end
-
 # TODO refactor all world data into a single global, for easy save/export
-def init_actors
+def init_actors(dungeon_level)
   # start w/ just the player
-  $actors = {
-    player: Actor.new($dungeon_level, {
+  actors = {
+    player: Actor.new(dungeon_level, {
       sigil: '@',
       fore_color: TCOD::Color::WHITE,
       back_color: TCOD::Color::DARKER_GREY,
-      x: $prng.rand(MAP_COLS),
-      y: $prng.rand(MAP_ROWS),
+      x: GlobalGameState::PRNG.rand(MAP_COLS),
+      y: GlobalGameState::PRNG.rand(MAP_ROWS),
       hp: 3,
       name: "The Dashing Hero",
       allegiance: :player,
@@ -98,78 +76,26 @@ def init_actors
   # now add baddies
   (ACTORS_MAX-1).times do |n|
     bsym = :"baddie_#{n}"
-    $actors[bsym] = Actor.new($dungeon_level, {
+    actors[bsym] = Actor.new(dungeon_level, {
       sigil: 'e',
       fore_color: TCOD::Color::LIGHT_SEPIA,
       back_color: TCOD::Color::BLACK,
-      x: $prng.rand(MAP_COLS),
-      y: $prng.rand(MAP_ROWS),
+      x: GlobalGameState::PRNG.rand(MAP_COLS),
+      y: GlobalGameState::PRNG.rand(MAP_ROWS),
       hp: 1,
       allegiance: :baddies,
       name: "Generic Bad Guy ##{n}"
     })
   end
-  $actors
-end
-
-def actor_at_location(location)
-  $actors.values.each do |actor|
-    actor_location = { x: actor.pos_x, y: actor.pos_y }
-    return actor if actor_location == location
-  end
-  return nil
-end
-
-def transparent?(cell)
-  cell != '#'
-end
-
-def allies_of(actor)
-  $actors.values.select{|a| a.allegiance == actor.allegiance}
-end
-
-def ally_at?(actor, col, row)
-  other_actor = actor_at_location({x: col, y: row})
-  return false unless other_actor
-
-  allies = allies_of actor
-  allies.include? other_actor
-end
-
-def walkable?(actor, col, row, cell)
-  cell == '.' && (not ally_at?(actor, col, row))
-end
-
-def coords_to_dir(dx, dy)
-  if dx < 0 && dy == 0
-    :left
-  elsif dx > 0 && dy == 0
-    :right
-  elsif dx == 0 && dy < 0
-    :up
-  elsif dx == 0 && dy > 0
-    :down
-  end
-end
-
-def initialize_game
-  TCOD.console_set_custom_font('dejavu16x16_gs_tc.png',
-                               TCOD::FONT_TYPE_GREYSCALE | TCOD::FONT_LAYOUT_TCOD, 0, 0)
-  TCOD.console_init_root(SCREEN_COLS, SCREEN_ROWS, 'tcod test', false, TCOD::RENDERER_SDL)
-  TCOD.sys_set_fps(LIMIT_FPS)
-
-  $dungeon_level = init_map
-  $actors = init_actors
-
-  msg_log "The Dashing Hero finds him/herself in a sticky situation."
+  actors
 end
 
 def player_is_alone?
-  $actors.values.count == 1 && (not $actors[:player].nil?)
+  GlobalGameState::ACTORS.values.count == 1 && (not GlobalGameState::PLAYER.nil?)
 end
 
 def process_nonplayer_actors
-  $actors.values.select{ |a| not a.player? }.each do |actor|
+  GlobalGameState::ACTORS.values.select{ |a| not a.player? }.each do |actor|
     move_dir = actor.decide_move
     actor.move move_dir
   end
@@ -178,31 +104,58 @@ end
 def msg_log(msg)
   while msg.length > MAX_MSG_LEN
     shorter_msg = msg[0...MAX_MSG_LEN]
-    $msg_log.push shorter_msg + " _"
+    GlobalGameState::MSG_LOG.push shorter_msg + " _"
     msg = msg[MAX_MSG_LEN..-1]
   end
-  $msg_log.push msg if msg.length > 0
+  GlobalGameState::MSG_LOG.push msg if msg.length > 0
+end
+
+def exit_game
+  msg_log "Press any key to exit."
+  GlobalUtilityState::DRAWER.draw_shit
+  k = get_input
+  while k == nil do
+    k = get_input
+  end
+  exit 0
 end
 
 ###
 
 $msg_log = []
 $prng = Random.new
+$drawer = Drawing.new MAP_ROWS, MAP_COLS
+module GlobalGameState
+  PRNG = $prng
+end
+$dungeon_level = DungeonLevel.new MAP_ROWS, MAP_COLS
+$actors = init_actors $dungeon_level
 
-initialize_game
+module GlobalGameState
+  # to be eventually replaced with DUNGEON, then WORLD, etc.
+  DUNGEON_LEVEL = $dungeon_level
+  ACTORS = $actors
+  PLAYER = $actors[:player]
+  MSG_LOG = $msg_log
+end
+
+module GlobalUtilityState
+  DRAWER = $drawer
+end
+
+msg_log "The Dashing Hero finds him/herself in a sticky situation."
 
 until TCOD.console_is_window_closed
-  Drawing.draw_shit
+  $drawer.draw_shit
 
-  entered_key = get_input
-  break if entered_key == TCOD::KEY_ESCAPE
-  player_acted = process_player_input entered_key
+  player_acted = process_input
 
   if player_acted
     process_nonplayer_actors
 
     if player_is_alone?
-      msg_log "You win!!! Score is 100. Press [ESC] to exit."
+      msg_log "You win!!! Score is 100."
+      exit_game
     end
   end
 end
