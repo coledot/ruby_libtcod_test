@@ -8,16 +8,8 @@ class DungeonLevel
     @cells[row][col] != '#'
   end
 
-  def walkable?(actor, col, row)
-    @cells[row][col] == '.' && (not ally_at?(actor, col, row))
-  end
-
-  def ally_at?(actor, col, row)
-    other_actor = actor_at_location({x: col, y: row})
-    return false unless other_actor
-  
-    allies = allies_of actor
-    allies.include? other_actor
+  def walkable?(col, row)
+    @cells[row][col] == '.'
   end
 
   # FIXME? does this belong here?
@@ -29,11 +21,6 @@ class DungeonLevel
     return nil
   end
   
-  # FIXME? does this belong here?
-  def allies_of(actor)
-    GlobalGameState::ACTORS.values.select{|a| a.allegiance == actor.allegiance}
-  end
-
   def init_random_level(rows, cols)
     level = []
     rows.times do |row|

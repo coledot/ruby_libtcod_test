@@ -124,7 +124,7 @@ end
 
 $msg_log = []
 $prng = Random.new
-$drawer = Drawing.new MAP_ROWS, MAP_COLS
+$drawer = Drawing.new
 module GlobalGameState
   PRNG = $prng
 end

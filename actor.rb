@@ -8,6 +8,7 @@ class Actor
     x: 0,
     y: 0,
     hp: 1,
+    sight_range: 8,
     name: "A faint yet distinct point of light",
     # TODO change allegiance to neutral; add an "activity" setting that defines if a creature is:
     #      sleeping, resting, hunting, pursuing, wandering, etc.
@@ -26,9 +27,16 @@ class Actor
     @name           = options[:name]
     @allegiance     = options[:allegiance]
     @player         = options[:player]
-    @dungeon_level = current_dlevel
+    @dungeon_level  = current_dlevel
+    @sight_range    = options[:sight_range]
+
+    tcod_map.compute_fov(@pos_x, @pos_y, @sight_range, true, TCOD::FOV_BASIC)
   end
   attr_accessor :sigil, :fore_color, :back_color, :pos_x, :pos_y, :hp, :name, :allegiance
+
+  def tcod_map
+    @tcod_map ||= make_tcod_map_from_dungeon_level
+  end
 
   def player?
     @player
@@ -50,8 +58,7 @@ class Actor
   def decide_move
     player = GlobalGameState::PLAYER
     if is_near? player
-      actor_map = make_tcod_map_from_dungeon_level
-      actor_path = TCOD::Path.by_map(actor_map, diagonalCost=0.0)
+      actor_path = TCOD::Path.by_map(tcod_map, diagonalCost=0.0)
       actor_path.compute(@pos_x, @pos_y, player.pos_x, player.pos_y)
       px, py = actor_path.walk
       if px == false
@@ -97,25 +104,12 @@ class Actor
       @pos_x, @pos_y = new_pos[:x], new_pos[:y]
     end
   
+    tcod_map.compute_fov(@pos_x, @pos_y, @sight_range, true, TCOD::FOV_BASIC)
     true
   end
 
-  def dir_to(other_actor)
-    dx = @pos_x - other_actor.pos_x
-    dy = @pos_y - other_actor.pos_y
-    if dx.abs > dy.abs
-      if dx > 0
-        :left
-      else
-        :right
-      end
-    else
-      if dy > 0
-        :up
-      else
-        :down
-      end
-    end
+  def within_line_of_sight?(col_ind, row_ind)
+    tcod_map.in_fov?(col_ind, row_ind)
   end
   
   private
@@ -129,9 +123,13 @@ class Actor
   end
 
   def is_near?(other_actor, distance=8)
-    dx = @pos_x - other_actor.pos_x
-    dy = @pos_y - other_actor.pos_y
-    (dx + dy).abs < distance
+    distance_to(other_actor.pos_x, other_actor.pos_y) < distance
+  end
+
+  def distance_to(col, row)
+    dx = @pos_x - col
+    dy = @pos_y - row
+    dx.abs + dy.abs
   end
 
   def hostile_towards?(other_actor)
@@ -173,14 +171,14 @@ class Actor
 
   def make_tcod_map_from_dungeon_level
     dlevel = where_am_i
-    tcod_map = TCOD::Map.new(dlevel.first.count, dlevel.count)
+    tmap = TCOD::Map.new(dlevel.first.count, dlevel.count)
     dlevel.each_with_index do |level_row, row_ind|
       level_row.each_with_index do |cell, col_ind|
-        tcod_map.set_properties(col_ind, row_ind, @dungeon_level.transparent?(col_ind, row_ind),
-                                @dungeon_level.walkable?(self, col_ind, row_ind))
+        tmap.set_properties(col_ind, row_ind, @dungeon_level.transparent?(col_ind, row_ind),
+                                              @dungeon_level.walkable?(col_ind, row_ind))
       end
     end
-    tcod_map
+    tmap
   end
 
   def coords_to_dir(dx, dy)
