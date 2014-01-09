@@ -78,7 +78,7 @@ def init_actors(dungeon_level)
     bsym = :"baddie_#{n}"
     actors[bsym] = Actor.new(dungeon_level, {
       sigil: 'e',
-      fore_color: TCOD::Color::LIGHT_SEPIA,
+      fore_color: TCOD::Color::SEPIA,
       back_color: TCOD::Color::BLACK,
       x: GlobalGameState::PRNG.rand(MAP_COLS),
       y: GlobalGameState::PRNG.rand(MAP_ROWS),

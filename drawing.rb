@@ -5,7 +5,7 @@ class Drawing
   SCREEN_ROWS = 40
   SCREEN_COLS = 60
 
-  DEFAULT_SCREEN_FORE_COLOR = TCOD::Color::LIGHTEST_GREY
+  DEFAULT_SCREEN_FORE_COLOR = TCOD::Color::LIGHTER_GREY
   DEFAULT_SCREEN_BACK_COLOR = TCOD::Color::BLACK
 
   def initialize(msg_log_rows)
@@ -48,11 +48,14 @@ class Drawing
       level_row.each_with_index do |cell, col_ind|
         screen_location = map_location_to_screen_location(col_ind, row_ind)
         if player.within_line_of_sight?(col_ind, row_ind)
-          back_color = TCOD::Color::DARKER_GREY
+          #back_color = TCOD::Color::DARKER_GREY
+          fore_color = TCOD::Color::LIGHT_GREY
+          back_color = TCOD::Color.rgb(0x24, 0x24, 0x24)
         else
-          back_color = TCOD::Color::BLACK
+          fore_color = TCOD::Color::GREY
+          back_color = DEFAULT_SCREEN_BACK_COLOR
         end
-        draw_char_to_location(cell, screen_location, back_color: back_color)
+        draw_char_to_location(cell, screen_location, fore_color: fore_color, back_color: back_color)
       end
     end
   end
@@ -62,7 +65,8 @@ class Drawing
     GlobalGameState::ACTORS.values.each do |actor|
       screen_location = map_location_to_screen_location(actor.pos_x, actor.pos_y)
       back_color = if actor.player? || player.within_line_of_sight?(actor.pos_x, actor.pos_y)
-        TCOD::Color::DARKER_GREY
+        #TCOD::Color::DARKER_GREY
+        TCOD::Color.rgb(0x24, 0x24, 0x24)
       else
         TCOD::Color::BLACK
       end
