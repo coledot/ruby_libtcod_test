@@ -4,8 +4,8 @@ require './actor'
 require './drawing'
 require './dungeon_level'
 
-MAP_ROWS = 16
-MAP_COLS = 32
+MAP_ROWS = 32
+MAP_COLS = 48
 
 MSG_LOG_ROWS = 6
 MSG_LOG_COLS = 60
@@ -124,7 +124,7 @@ end
 
 $msg_log = []
 $prng = Random.new
-$drawer = Drawing.new
+$drawer = Drawing.new MSG_LOG_ROWS
 module GlobalGameState
   PRNG = $prng
 end

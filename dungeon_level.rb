@@ -12,15 +12,6 @@ class DungeonLevel
     @cells[row][col] == '.'
   end
 
-  # FIXME? does this belong here?
-  def actor_at_location(location)
-    GlobalGameState::ACTORS.values.each do |actor|
-      actor_location = { x: actor.pos_x, y: actor.pos_y }
-      return actor if actor_location == location
-    end
-    return nil
-  end
-  
   def init_random_level(rows, cols)
     level = []
     rows.times do |row|

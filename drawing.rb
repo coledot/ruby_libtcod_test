@@ -2,15 +2,15 @@ require 'libtcod'
 
 class Drawing
   LIMIT_FPS = 20
-  SCREEN_ROWS = 24
+  SCREEN_ROWS = 40
   SCREEN_COLS = 60
-
-  SCREEN_MSG_LOG_OFFSET_ROWS = 18 # FIXME dependent on MSG_LOG_ROWS
 
   DEFAULT_SCREEN_FORE_COLOR = TCOD::Color::LIGHTEST_GREY
   DEFAULT_SCREEN_BACK_COLOR = TCOD::Color::BLACK
 
-  def initialize()
+  def initialize(msg_log_rows)
+    @msg_log_rows = msg_log_rows
+    @screen_msg_log_offset_rows = SCREEN_ROWS - @msg_log_rows
     TCOD.console_set_custom_font('dejavu16x16_gs_tc.png',
                                  TCOD::FONT_TYPE_GREYSCALE | TCOD::FONT_LAYOUT_TCOD, 0, 0)
     TCOD.console_init_root(SCREEN_COLS, SCREEN_ROWS, 'tcod test', false, TCOD::RENDERER_SDL)
@@ -72,8 +72,8 @@ class Drawing
   end
 
   def draw_log
-    GlobalGameState::MSG_LOG.last(MSG_LOG_ROWS).each_with_index do |msg, i|
-      TCOD.console_print(nil, TCOD::LEFT, SCREEN_MSG_LOG_OFFSET_ROWS+i, msg)
+    GlobalGameState::MSG_LOG.last(@msg_log_rows).each_with_index do |msg, i|
+      TCOD.console_print(nil, TCOD::LEFT, @screen_msg_log_offset_rows+i, msg)
     end
   end
 

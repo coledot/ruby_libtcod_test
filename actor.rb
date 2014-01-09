@@ -89,7 +89,7 @@ class Actor
       return true
     end
   
-    other_actor = @dungeon_level.actor_at_location(new_pos)
+    other_actor = Actor.actor_at_location(new_pos)
     if other_actor
       if hostile_towards? other_actor
         proc_attack other_actor
@@ -112,6 +112,14 @@ class Actor
     tcod_map.in_fov?(col_ind, row_ind)
   end
   
+  def self.actor_at_location(location)
+    GlobalGameState::ACTORS.values.each do |actor|
+      actor_location = { x: actor.pos_x, y: actor.pos_y }
+      return actor if actor_location == location
+    end
+    return nil
+  end
+
   private
 
   def free_moves
