@@ -35,18 +35,20 @@ end
 
 def process_player_input input_key
   return false unless input_key
+  return false if input_key == "\x00"
 
   player = GlobalGameState::PLAYER
 
+  # TODO implement running
   # movement keys
   player_moved = if input_key == 'k'
-    player.move :up
+    player.move :north
   elsif input_key == 'j'
-    player.move :down
+    player.move :south
   elsif input_key == 'h'
-    player.move :left
+    player.move :west
   elsif input_key == 'l'
-    player.move :right
+    player.move :east
   elsif input_key == '.'
     player.move :rest
   else
@@ -150,6 +152,8 @@ until TCOD.console_is_window_closed
 
   player_acted = process_input
 
+  # NOTE keep in mind, a proper time system will likely need to be implemented at some point,
+  #      so things will get more complicated than "player goes, monsters go, repeat until end"
   if player_acted
     process_nonplayer_actors
 

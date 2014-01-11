@@ -66,7 +66,7 @@ class Actor
       end
   
       dx, dy = px - @pos_x, py - @pos_y
-      dir = coords_to_dir(dx, dy)
+      dir = delta_to_dir(dx, dy)
     else
       dir = free_moves.sample
     end
@@ -75,21 +75,16 @@ class Actor
 
   def move(dir)
     return false unless can_move? dir
+    return true if dir == :rest
+
+    dy = dx = 0
+
+    dy += 1 if dir == :south
+    dy -= 1 if dir == :north
+    dx -= 1 if dir == :west
+    dx += 1 if dir == :east
   
-    if dir == :left
-      new_pos = { x: @pos_x - 1, y: @pos_y }
-    elsif dir == :right
-      new_pos = { x: @pos_x + 1, y: @pos_y }
-    elsif dir == :up
-      new_pos = { x: @pos_x, y: @pos_y - 1 }
-    elsif dir == :down
-      new_pos = { x: @pos_x, y: @pos_y + 1 }
-    elsif dir == :rest
-      # resting always succeeds
-      return true
-    end
-  
-    other_actor = Actor.actor_at_location(new_pos)
+    other_actor = Actor.actor_at_position(@pos_y + dy, @pos_x + dx)
     if other_actor
       if hostile_towards? other_actor
         proc_attack other_actor
@@ -101,10 +96,10 @@ class Actor
         return false
       end
     else
-      @pos_x, @pos_y = new_pos[:x], new_pos[:y]
+      @pos_x += dx; @pos_y += dy
     end
   
-    tcod_map.compute_fov(@pos_x, @pos_y, @sight_range, true, TCOD::FOV_BASIC)
+    tcod_map.compute_fov(@pos_x, @pos_y, @sight_range, true, TCOD::FOV_DIAMOND)
     true
   end
 
@@ -112,10 +107,9 @@ class Actor
     tcod_map.in_fov?(col_ind, row_ind)
   end
   
-  def self.actor_at_location(location)
+  def self.actor_at_position(row, col)
     GlobalGameState::ACTORS.values.each do |actor|
-      actor_location = { x: actor.pos_x, y: actor.pos_y }
-      return actor if actor_location == location
+      return actor if actor.pos_x == col && actor.pos_y == row
     end
     return nil
   end
@@ -123,11 +117,7 @@ class Actor
   private
 
   def free_moves
-    [:up, :down, :left, :right].select { |dir| can_move? dir }
-  end
-
-  def where_am_i
-    @dungeon_level.cells
+    [:north, :south, :west, :east].select { |dir| can_move? dir }
   end
 
   def is_near?(other_actor, distance=8)
@@ -145,19 +135,16 @@ class Actor
   end
 
   def can_move?(dir)
-    level = where_am_i
+    dx, dy = dir_to_delta(dir)
+    @dungeon_level.walkable?(@pos_x + dx, @pos_y + dy)
+  end
 
-    if dir == :left
-      @pos_x > 0 && level[@pos_y][@pos_x-1] == '.'
-    elsif dir == :right
-      @pos_x < MAP_COLS - 1 && level[@pos_y][@pos_x+1] == '.'
-    elsif dir == :up
-      @pos_y > 0 && level[@pos_y-1][@pos_x] == '.'
-    elsif dir == :down
-      @pos_y < MAP_ROWS - 1 && level[@pos_y+1][@pos_x] == '.'
-    elsif dir == :rest
-      true
-    end
+  def dir_to_delta(dir)
+    return [ 0, 1] if dir == :south
+    return [ 0,-1] if dir == :north
+    return [-1, 0] if dir == :west
+    return [ 1, 0] if dir == :east
+    return [ 0, 0]
   end
 
   def proc_attack(victim)
@@ -178,7 +165,7 @@ class Actor
   end
 
   def make_tcod_map_from_dungeon_level
-    dlevel = where_am_i
+    dlevel = @dungeon_level.cells
     tmap = TCOD::Map.new(dlevel.first.count, dlevel.count)
     dlevel.each_with_index do |level_row, row_ind|
       level_row.each_with_index do |cell, col_ind|
@@ -189,16 +176,12 @@ class Actor
     tmap
   end
 
-  def coords_to_dir(dx, dy)
-    if dx < 0 && dy == 0
-      :left
-    elsif dx > 0 && dy == 0
-      :right
-    elsif dx == 0 && dy < 0
-      :up
-    elsif dx == 0 && dy > 0
-      :down
-    end
+  def delta_to_dir(dx, dy)
+    return :north if dy < 0
+    return :south if dy > 0
+    return :west if dx < 0
+    return :east if dx > 0
+    return :rest
   end
 end
 
