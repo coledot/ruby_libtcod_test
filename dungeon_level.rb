@@ -2,10 +2,8 @@ require 'yaml'
 
 class DungeonLevel
   def initialize(rows, cols)
-    #@num_rows = rows
-    #@num_cols = cols
-    #@cells = init_random_level rows, cols
-    open_map_file("maps/hello.map")
+    #open_map_file("maps/hello.map")
+    open_map_file("maps/surrounded.map")
   end
   attr_accessor :cells
 

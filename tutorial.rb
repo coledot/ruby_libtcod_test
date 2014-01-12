@@ -8,10 +8,10 @@ MAP_ROWS = 32
 MAP_COLS = 48
 
 MSG_LOG_ROWS = 6
-MSG_LOG_COLS = 60
+MSG_LOG_COLS = 80
 MAX_MSG_LEN = MSG_LOG_COLS - 2
 
-ACTORS_MAX = 20
+ACTORS_MAX = 40
 
 def process_input
   entered_key = get_input
