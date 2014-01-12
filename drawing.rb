@@ -48,9 +48,7 @@ class Drawing
     GlobalGameState::DUNGEON_LEVEL.cells.each_with_index do |level_row, row_ind|
       level_row.each_with_index do |cell, col_ind|
         screen_location = map_location_to_screen_location(col_ind, row_ind)
-        # FIXME LOS broken until player takes first turn
         if player.within_line_of_sight?(col_ind, row_ind)
-          #back_color = TCOD::Color::DARKER_GREY
           fore_color = TCOD::Color::LIGHT_GREY
           back_color = TCOD::Color.rgb(0x24, 0x24, 0x24)
         else

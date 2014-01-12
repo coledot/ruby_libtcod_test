@@ -30,13 +30,13 @@ class Actor
     @dungeon_level  = current_dlevel
     @sight_range    = options[:sight_range]
 
-    if outside_map?
-      place_in_map! 
-    else
-      tcod_map.compute_fov(@pos_x, @pos_y, @sight_range, true, TCOD::FOV_BASIC)
-    end
+    place_in_map! if outside_map?
   end
   attr_accessor :sigil, :fore_color, :back_color, :pos_x, :pos_y, :hp, :name, :allegiance
+
+  def poke
+    tcod_map.compute_fov(@pos_x, @pos_y, @sight_range, true, TCOD::FOV_BASIC)
+  end
 
   def place_in_map!
     @pos_x, @pos_y = if player?
@@ -123,18 +123,10 @@ class Actor
   end
 
   def within_line_of_sight?(col_ind, row_ind)
-    if player?
-      puts "DEBUG: player.within_line_of_sight?(#{col_ind},#{row_ind}) called"
-    end
-
     retval = if outside_map?
       false 
     else
       tcod_map.in_fov?(col_ind, row_ind)
-    end
-
-    if player?
-      puts "DEBUG: player.within_line_of_sight?(#{col_ind},#{row_ind}) is returning #{retval}"
     end
     return retval
   end

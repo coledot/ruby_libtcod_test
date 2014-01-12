@@ -130,8 +130,11 @@ module GlobalGameState
 end
 $dungeon_level = DungeonLevel.new MAP_ROWS, MAP_COLS
 $actors = init_actors $dungeon_level
+# FIXME? what tangled dependencies we weave
 # must be done after init_actors
 $dungeon_level.apply_template!
+# must be done after dungeon_level.apply_template!
+$actors.values.each { |a| a.poke }
 
 module GlobalGameState
   # to be eventually replaced with DUNGEON, then WORLD, etc.
