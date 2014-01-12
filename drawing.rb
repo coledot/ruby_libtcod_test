@@ -2,7 +2,7 @@ require 'libtcod'
 
 class Drawing
   LIMIT_FPS = 20
-  SCREEN_ROWS = 40
+  SCREEN_ROWS = 50
   SCREEN_COLS = 80
 
   DEFAULT_SCREEN_FORE_COLOR = TCOD::Color::LIGHTER_GREY
@@ -17,12 +17,13 @@ class Drawing
     TCOD.sys_set_fps(LIMIT_FPS)
 
     # offset of map within screen
-    @screen_map_offset_rows = 1
-    @screen_map_offset_cols = 1
+    @screen_map_offset_rows = 3
+    @screen_map_offset_cols = 3
   end
 
   def draw_shit
     draw_background
+    draw_markers
     draw_map
     draw_actors
     draw_log
@@ -47,6 +48,7 @@ class Drawing
     GlobalGameState::DUNGEON_LEVEL.cells.each_with_index do |level_row, row_ind|
       level_row.each_with_index do |cell, col_ind|
         screen_location = map_location_to_screen_location(col_ind, row_ind)
+        # FIXME LOS broken until player takes first turn
         if player.within_line_of_sight?(col_ind, row_ind)
           #back_color = TCOD::Color::DARKER_GREY
           fore_color = TCOD::Color::LIGHT_GREY
@@ -56,6 +58,22 @@ class Drawing
           back_color = DEFAULT_SCREEN_BACK_COLOR
         end
         draw_char_to_location(cell, screen_location, fore_color: fore_color, back_color: back_color)
+      end
+    end
+  end
+
+  def draw_markers
+    (0..(SCREEN_COLS - 30)).step(5) do |col_num|
+      col_num.to_s.chars.each_with_index do |char, i|
+        location = { x: col_num + @screen_map_offset_cols, y: i }
+        draw_char_to_location(char, location, fore_color: TCOD::Color::WHITE)
+      end
+    end
+
+    (0..(SCREEN_ROWS - 15)).step(5) do |row_num|
+      row_num.to_s.chars.each_with_index do |char, i|
+        location = { x: i, y: row_num + @screen_map_offset_rows }
+        draw_char_to_location(char, location, fore_color: TCOD::Color::WHITE)
       end
     end
   end

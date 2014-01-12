@@ -123,8 +123,20 @@ class Actor
   end
 
   def within_line_of_sight?(col_ind, row_ind)
-    return false if outside_map?
-    tcod_map.in_fov?(col_ind, row_ind)
+    if player?
+      puts "DEBUG: player.within_line_of_sight?(#{col_ind},#{row_ind}) called"
+    end
+
+    retval = if outside_map?
+      false 
+    else
+      tcod_map.in_fov?(col_ind, row_ind)
+    end
+
+    if player?
+      puts "DEBUG: player.within_line_of_sight?(#{col_ind},#{row_ind}) is returning #{retval}"
+    end
+    return retval
   end
   
   def self.actor_at_position(row, col)

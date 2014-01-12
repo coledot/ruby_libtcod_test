@@ -60,15 +60,12 @@ def process_player_input input_key
 end
 
 # TODO refactor all world data into a single global, for easy save/export
-# TODO create actors w/o a position; place them later
 def init_actors(dungeon_level)
   # start w/ just the player
   player = Actor.new(dungeon_level, {
       sigil: '@',
       fore_color: TCOD::Color::WHITE,
       back_color: TCOD::Color::DARKER_GREY,
-      #x: GlobalGameState::PRNG.rand(MAP_COLS),
-      #y: GlobalGameState::PRNG.rand(MAP_ROWS),
       hp: 3,
       name: "The Dashing Hero",
       allegiance: :player,
@@ -83,8 +80,6 @@ def init_actors(dungeon_level)
       sigil: 'e',
       fore_color: TCOD::Color::SEPIA,
       back_color: TCOD::Color::BLACK,
-      #x: GlobalGameState::PRNG.rand(MAP_COLS),
-      #y: GlobalGameState::PRNG.rand(MAP_ROWS),
       hp: 1,
       allegiance: :baddies,
       name: "Generic Bad Guy ##{n}"
@@ -92,7 +87,6 @@ def init_actors(dungeon_level)
     bsym = :"baddie_#{n}"
     actors[bsym] = badguy
   end
-  $dungeon_level.apply_template!
   actors
 end
 
@@ -136,6 +130,8 @@ module GlobalGameState
 end
 $dungeon_level = DungeonLevel.new MAP_ROWS, MAP_COLS
 $actors = init_actors $dungeon_level
+# must be done after init_actors
+$dungeon_level.apply_template!
 
 module GlobalGameState
   # to be eventually replaced with DUNGEON, then WORLD, etc.

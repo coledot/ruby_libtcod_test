@@ -51,7 +51,7 @@ class DungeonLevel
     @num_rows.times { @cells.push([WALL_CHAR] * @num_cols) }
     @template_cells.each_with_index do |row, row_ind|
       row.each_with_index do |cell, col_ind|
-        cell = '.' if ["x", "@"].include? cell
+        cell = FLOOR_CHAR if ["x", "@"].include? cell
         @cells[row_ind][col_ind] = cell
       end
     end
