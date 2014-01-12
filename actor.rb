@@ -5,8 +5,8 @@ class Actor
     sigil: '*',
     fore_color: TCOD::Color::WHITE,
     back_color: TCOD::Color::BLACK,
-    x: 0,
-    y: 0,
+    x: -1,
+    y: -1,
     hp: 1,
     sight_range: 8,
     name: "A faint yet distinct point of light",
@@ -30,9 +30,21 @@ class Actor
     @dungeon_level  = current_dlevel
     @sight_range    = options[:sight_range]
 
-    tcod_map.compute_fov(@pos_x, @pos_y, @sight_range, true, TCOD::FOV_BASIC)
+    if outside_map?
+      place_in_map! 
+    else
+      tcod_map.compute_fov(@pos_x, @pos_y, @sight_range, true, TCOD::FOV_BASIC)
+    end
   end
   attr_accessor :sigil, :fore_color, :back_color, :pos_x, :pos_y, :hp, :name, :allegiance
+
+  def place_in_map!
+    @pos_x, @pos_y = if player?
+      @dungeon_level.player_spawn_point
+    else
+      @dungeon_level.monster_spawn_point
+    end
+  end
 
   def tcod_map
     @tcod_map ||= make_tcod_map_from_dungeon_level
@@ -55,7 +67,13 @@ class Actor
     GlobalGameState::ACTORS.delete(GlobalGameState::ACTORS.key(self))
   end
 
+  def outside_map?
+    @pos_x == -1 || @pos_y == -1
+  end
+
   def decide_move
+    return :rest if outside_map?
+
     player = GlobalGameState::PLAYER
     if is_near? player
       actor_path = TCOD::Path.by_map(tcod_map, diagonalCost=0.0)
@@ -74,8 +92,9 @@ class Actor
   end
 
   def move(dir)
-    return false unless can_move? dir
     return true if dir == :rest
+    return false if outside_map?
+    return false unless can_move? dir
 
     dy = dx = 0
 
@@ -104,6 +123,7 @@ class Actor
   end
 
   def within_line_of_sight?(col_ind, row_ind)
+    return false if outside_map?
     tcod_map.in_fov?(col_ind, row_ind)
   end
   
@@ -117,7 +137,8 @@ class Actor
   private
 
   def free_moves
-    [:north, :south, :west, :east].select { |dir| can_move? dir }
+    return [:rest] if outside_map?
+    [:north, :south, :west, :east, :rest].select { |dir| can_move? dir }
   end
 
   def is_near?(other_actor, distance=8)

@@ -60,35 +60,39 @@ def process_player_input input_key
 end
 
 # TODO refactor all world data into a single global, for easy save/export
+# TODO create actors w/o a position; place them later
 def init_actors(dungeon_level)
   # start w/ just the player
-  actors = {
-    player: Actor.new(dungeon_level, {
+  player = Actor.new(dungeon_level, {
       sigil: '@',
       fore_color: TCOD::Color::WHITE,
       back_color: TCOD::Color::DARKER_GREY,
-      x: GlobalGameState::PRNG.rand(MAP_COLS),
-      y: GlobalGameState::PRNG.rand(MAP_ROWS),
+      #x: GlobalGameState::PRNG.rand(MAP_COLS),
+      #y: GlobalGameState::PRNG.rand(MAP_ROWS),
       hp: 3,
       name: "The Dashing Hero",
       allegiance: :player,
       player: true
     })
+  actors = {
+    player: player
   }
   # now add baddies
   (ACTORS_MAX-1).times do |n|
-    bsym = :"baddie_#{n}"
-    actors[bsym] = Actor.new(dungeon_level, {
+    badguy = Actor.new(dungeon_level, {
       sigil: 'e',
       fore_color: TCOD::Color::SEPIA,
       back_color: TCOD::Color::BLACK,
-      x: GlobalGameState::PRNG.rand(MAP_COLS),
-      y: GlobalGameState::PRNG.rand(MAP_ROWS),
+      #x: GlobalGameState::PRNG.rand(MAP_COLS),
+      #y: GlobalGameState::PRNG.rand(MAP_ROWS),
       hp: 1,
       allegiance: :baddies,
       name: "Generic Bad Guy ##{n}"
     })
+    bsym = :"baddie_#{n}"
+    actors[bsym] = badguy
   end
+  $dungeon_level.apply_template!
   actors
 end
 
