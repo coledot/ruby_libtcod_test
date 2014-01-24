@@ -23,23 +23,25 @@ class DungeonLevel
   def player_spawn_point
     point = template_points_for('@').sample
     if point
-      # remove from consideration
-      @template_cells[point[1]][point[0]] = FLOOR_CHAR
+      clear_template_cell(point[1], point[0])
       return point
     else
-      [(0...@num_cols).to_a.sample, (0...@num_rows).to_a.sample]
+      return random_point
     end
   end
 
   def monster_spawn_point
     point = template_points_for('x').sample
     if point
-      # remove from consideration
       clear_template_cell(point[1], point[0])
       return point
     else
-      [(0...@num_cols).to_a.sample, (0...@num_rows).to_a.sample]
+      return random_point
     end
+  end
+
+  def random_point
+    [(0...@num_cols).to_a.sample, (0...@num_rows).to_a.sample]
   end
 
   def clear_template_cell(row, col)

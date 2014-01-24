@@ -35,7 +35,7 @@ class Actor
   attr_accessor :sigil, :fore_color, :back_color, :pos_x, :pos_y, :hp, :name, :allegiance
 
   def poke
-    tcod_map.compute_fov(@pos_x, @pos_y, @sight_range, true, TCOD::FOV_BASIC)
+    update_fov
   end
 
   def place_in_map!
@@ -118,8 +118,14 @@ class Actor
       @pos_x += dx; @pos_y += dy
     end
   
-    tcod_map.compute_fov(@pos_x, @pos_y, @sight_range, true, TCOD::FOV_DIAMOND)
+    update_fov
     true
+  end
+
+  def update_fov
+    #tcod_map.compute_fov(@pos_x, @pos_y, @sight_range, true, TCOD::FOV_SHADOW)
+    tcod_map.compute_fov(@pos_x, @pos_y, @sight_range, true, TCOD::FOV_PERMISSIVE_2)
+    #tcod_map.compute_fov(@pos_x, @pos_y, @sight_range, true, TCOD::FOV_RESTRICTIVE)
   end
 
   def within_line_of_sight?(col_ind, row_ind)
@@ -173,9 +179,10 @@ class Actor
   end
 
   def proc_attack(victim)
-    # TODO expand to victims, plural
-    # `self` is the assailant
-    victim.hurt 1
+    # note: `self` is the assailant
+    hp_damage = calc_damage
+    msg_log "#{@name} hit #{victim.name} for #{hp_damage} HP"
+    victim.hurt hp_damage
     if victim.player? && victim.alive?
       msg_log "Ouch! HP remaining: #{victim.hp}"
     end
@@ -187,6 +194,10 @@ class Actor
         exit_game
       end
     end
+  end
+
+  def calc_damage
+    1
   end
 
   def make_tcod_map_from_dungeon_level

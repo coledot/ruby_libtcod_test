@@ -11,8 +11,6 @@ MSG_LOG_ROWS = 6
 MSG_LOG_COLS = 80
 MAX_MSG_LEN = MSG_LOG_COLS - 2
 
-ACTORS_MAX = 40
-
 def process_input
   entered_key = get_input
   exit_game if entered_key == TCOD::KEY_ESCAPE
@@ -62,32 +60,53 @@ end
 # TODO refactor all world data into a single global, for easy save/export
 def init_actors(dungeon_level)
   # start w/ just the player
-  player = Actor.new(dungeon_level, {
-      sigil: '@',
-      fore_color: TCOD::Color::WHITE,
-      back_color: TCOD::Color::DARKER_GREY,
-      hp: 3,
-      name: "The Dashing Hero",
-      allegiance: :player,
-      player: true
-    })
   actors = {
-    player: player
+    player: create_player(dungeon_level, "You")
   }
   # now add baddies
-  (ACTORS_MAX-1).times do |n|
-    badguy = Actor.new(dungeon_level, {
-      sigil: 'e',
-      fore_color: TCOD::Color::SEPIA,
-      back_color: TCOD::Color::BLACK,
-      hp: 1,
-      allegiance: :baddies,
-      name: "Generic Bad Guy ##{n}"
-    })
+  15.times do |n|
     bsym = :"baddie_#{n}"
-    actors[bsym] = badguy
+    actors[bsym] = create_badguy(dungeon_level, n)
+  end
+  5.times do |n|
+    bsym = :"big_baddie_#{n}"
+    actors[bsym] = create_big_badguy(dungeon_level, n)
   end
   actors
+end
+
+def create_player(dungeon_level, name)
+  Actor.new(dungeon_level, {
+    sigil: '@',
+    fore_color: TCOD::Color::WHITE,
+    back_color: TCOD::Color::DARKER_GREY,
+    hp: 7,
+    name: name,
+    allegiance: :player,
+    player: true
+  })
+end
+
+def create_badguy(dungeon_level, id)
+  Actor.new(dungeon_level, {
+    sigil: 'e',
+    fore_color: TCOD::Color::SEPIA,
+    back_color: TCOD::Color::BLACK,
+    hp: 1,
+    allegiance: :baddies,
+    name: "Generic Bad Guy ##{id}"
+  })
+end
+
+def create_big_badguy(dungeon_level, id)
+  Actor.new(dungeon_level, {
+    sigil: 'E',
+    fore_color: TCOD::Color::LIGHT_SEPIA,
+    back_color: TCOD::Color::BLACK,
+    hp: 2,
+    allegiance: :baddies,
+    name: "Generic Big Bad Guy ##{id}"
+  })
 end
 
 def player_is_alone?
